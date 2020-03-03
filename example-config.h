@@ -3,3 +3,4 @@
 #define MQTT_SERVER "192.168.1.1";
 #define MQTT_USER "username";
 #define MQTT_PASS "password";
+#define MQTT_PORT "1883";
