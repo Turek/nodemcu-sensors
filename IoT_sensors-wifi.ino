@@ -1,9 +1,15 @@
+#include "config.h"
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <DHT_U.h>
 #include <ESP8266WiFi.h>
 #define DHTTYPE DHT22
 
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASS;
+const char* mqtt_server = MQTT_SERVER;
+const char* mqtt_username = MQTT_USER;
+const char* mqtt_password = MQTT_PASS;
 
 float Temperature;
 float Humidity;
@@ -137,7 +143,7 @@ void runEvery5minutes() {
 }
 
 void mqttPush(char* topic, char* payload) {
-  if (client.connect("arduinoClient", mqtt_username, mqtt_username)) {
+  if (client.connect("arduinoClient", mqtt_username, mqtt_password)) {
     client.publish(topic, payload);
   }
 }
