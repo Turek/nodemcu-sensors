@@ -1,6 +1,6 @@
 /*
  Sample office automation feeding to my local MQTT server.
- Gathering data from toilet sensors and main gate.
+ Gathering data from few sensors around the toilet area.
 
  Developed by Tomasz Turczynski
  - tomasz@turczynski.com
@@ -8,32 +8,22 @@
  
 */
 
-// Include local files.
-#include "config.h"
-#include "variables.h"
 // Include needed libraries.
+#include <HashMap.h>
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <DHT_U.h>
 #include <ESP8266WiFi.h>
 
-
-int gateSensorLeftState;
-int gateSensorRightState;
-int frontDoorSensorState;
-int safeSensorState;
-
-// Switch sensors
-int gateSensorLeft = 5; //D1
-int gateSensorRight = 4; //D2
-int frontDoorSensor = 14; //D5
-int safeSensor = 13; //D7
+// Include local files.
+#include "config.h"
+#include "variables.h"
 
 // Instantiate DHT sensor.
-DHT dht(DHTPin, DHTTYPE);
-
-// Instantiate MQTT client.
+DHT dht(pins[5], DHTTYPE);
+// Instantiate WiFi client.
 WiFiClient espClient;
+// Instantiate MQTT client.
 PubSubClient client(espClient);
 
 // The setup routine runs once when you press reset.
@@ -57,70 +47,74 @@ void setup() {
   Serial.println(WiFi.localIP()); 
 
   // Initialize switch sensors.
-  pinMode(gateSensorLeft, INPUT);
-  pinMode(gateSensorRight, INPUT);
-  pinMode(frontDoorSensor, INPUT);
-  pinMode(safeSensor, INPUT);
-  pinMode(bellSensor, INPUT);
+  for (byte i = 0; i < sizeof(pins); i = i + 1) {
+    pinMode(pins[i], INPUT);
+    Serial.println(i);
+  }
 
   // Initialize DHT sensor.
-  pinMode(DHTPin, INPUT);
   dht.begin();
 
   // Init MQTT client.
   client.setServer(mqtt_server, mqtt_port);
 }
 
-// the loop routine runs over and over again forever:
+/** 
+ * The loop routine runs over and over again forever.
+ */
 void loop() {
   milliseconds = millis();
   every5minutes = milliseconds % (1000UL * 60 * 5); // 5 minute interval
+
   // Execute tasks every 5 minutes.
   if (every5minutes >= 0 && every5minutes < 5) {
     runEvery5minutes();
   }
-  // read the input pin:
-  gateSensorLeftState = digitalRead(gateSensorLeft);
-  gateSensorRightState = digitalRead(gateSensorRight);
-  frontDoorSensorState = digitalRead(frontDoorSensor);
-  safeSensorState = digitalRead(safeSensor);
-  bellSensorState = digitalRead(bellSensor);
-  processBellSensor(bellSensorState);
-  // print out the state of the button:
-//  Serial.print("gateSensorLeftState:");
-//  Serial.println(gateSensorLeftState);
-//  Serial.print("gateSensorRightState:");
-//  Serial.println(gateSensorRightState);
-//  Serial.print("frontDoorSensorState:");
-//  Serial.println(frontDoorSensorState);
-//  Serial.print("safeSensorState:");
-//  Serial.println(safeSensorState);
-  
+
+  // Process sensor states.
+  for (byte i = 0; i < sizeof(pins) - 1; i = i + 1) {
+    state[i] = digitalRead(pins[i]);
+    processSensor(i, state[i]);
+  }
+
   client.loop();
 }
 
-void processBellSensor(uint8_t state) {
+/**
+ * Process and send Bell sensor readout.
+ * 
+ * @param uint8_t state
+ * @return bool
+ */
+bool processSensor(byte sensorId, uint8_t currentState) {
   // If the switch changed, due to noise or pressing:
-  if (state != lastBellSensorState) {
+  if (currentState != lastState[sensorId]) {
     // reset the debouncing timer
-    lastBellSensorDebounceTime = millis();
+    lastDebounceTime[sensorId] = millis();
   }
-  if ((millis() - lastBellSensorDebounceTime) > debounceDelay) {
+  if ((millis() - lastDebounceTime[sensorId]) > debounceDelay) {
     // whatever the reading is at, it's been there for longer than the debounce
     // delay, so take it as the actual current state:
-    state = digitalRead(bellSensor);
+    currentState = digitalRead(pins[sensorId]);
     // if the button state has changed:
-    if (state != bellSensorState) {
-      bellSensorState = state;
+    if (currentState != state[sensorId]) {
+      state[sensorId] = currentState;
     }
   }
-  if (lastSentBellSensorState != bellSensorState) {
-    snprintf(msg, 50, "%d", state);
-    mqttPush("bellSensorState", msg);
-    lastSentBellSensorState = bellSensorState;
+  if (lastSentState[sensorId] != state[sensorId]) {
+    snprintf(msg, 50, "%d", currentState);
+    mqttPush(sensorNames[sensorId], msg);
+    lastSentState[sensorId] = state[sensorId];
+
+    return true;
   }
+  
+  return false;
 }
 
+/**
+ * All the stuff that needs to run every 5 minutes.
+ */
 void runEvery5minutes() {
   // Gets the values of the temperature
   Temperature = dht.readTemperature();
@@ -134,6 +128,12 @@ void runEvery5minutes() {
   mqttPush("toiletHumidity", msg);
 }
 
+/**
+ * Send data to MQTT server.
+ * 
+ * @param char topic
+ * @param char payload
+ */
 void mqttPush(char* topic, char* payload) {
   if (client.connect("arduinoClient", mqtt_username, mqtt_password)) {
     client.publish(topic, payload);

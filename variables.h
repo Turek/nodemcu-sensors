@@ -11,20 +11,33 @@ unsigned long milliseconds;
 unsigned long every5minutes;
 
 // Define debouncer delay.
-unsigned long debounceDelay = 50;
+unsigned long debounceDelay = 500;
 
 // Store our messages here before posting.
 char msg[50];
 
 // Define DHT pin and readout variables.
-const uint8_t DHTPin = 12; // D6 pin.
 float Temperature;
 float Humidity;
 #define DHTTYPE DHT22
 
-// Bell sensor variables.
-const uint8_t bellSensor = 2; // D4 pin.
-uint8_t bellSensorState;
-uint8_t lastBellSensorState = HIGH;
-uint8_t lastSentBellSensorState;
-unsigned long lastBellSensorDebounceTime = 0;
+const uint8_t pins[] = {
+  D1,  // Left gate
+  D2,  // Right gate
+  D5, // Front door
+  D7, // Safe
+  D4,  // Bell
+  D6  // DHT
+};
+
+uint8_t state[5];
+uint8_t lastState[] = {HIGH,HIGH,HIGH,HIGH,HIGH};
+uint8_t lastSentState[5];
+unsigned long lastDebounceTime[] = {0,0,0,0,0};
+char *sensorNames[] = {
+  "Left gate",
+  "Right gate",
+  "Front door",
+  "Safe",
+  "Bell",
+};
