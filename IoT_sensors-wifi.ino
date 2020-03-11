@@ -9,7 +9,6 @@
 */
 
 // Include needed libraries.
-#include <HashMap.h>
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <DHT_U.h>
